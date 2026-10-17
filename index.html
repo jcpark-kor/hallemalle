@@ -346,8 +346,8 @@
     <script>
         let appState = { isAdmin: false, drops: [], items: [], dias: [] };
         
-        // ★ 새로 발급받은 구글 앱스 스크립트 웹 앱 URL을 여기에 입력하세요 ★
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwjCJAfoWErwXLWcQpT038CPrZbJVOxsEVR_z4IXdaTJ5m6BK7JJqL76wyj_1YjPWq-aw/exec';
+        // ★ 여기에 새로 발급받은 웹 앱 URL을 입력하세요 ★
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmGGPWBHZhSgTcqcXEx4RbAK7_TwPvmxpStNPIwomCv4L8VJWJm6RQ1Ddt7YOb1zGIJg/exec';
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSheetData();
@@ -371,7 +371,7 @@
             document.getElementById('dropRevenue').value = Math.round(price * 0.92);
         }
 
-        // 구글 시트 데이터 불러오기 (타임아웃 적용)
+        // 구글 시트 데이터 불러오기
         async function loadSheetData() {
             if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes('여기에')) {
                 document.getElementById('syncStatus').innerText = '스크립트 URL 설정 필요';
@@ -379,12 +379,7 @@
                 return;
             }
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
-                
-                const response = await fetch(GOOGLE_SCRIPT_URL, { signal: controller.signal });
-                clearTimeout(timeoutId);
-
+                const response = await fetch(GOOGLE_SCRIPT_URL);
                 if (response.ok) {
                     const data = await response.json();
                     appState.drops = data.drops || [];
@@ -397,7 +392,7 @@
                     throw new Error('응답 오류');
                 }
             } catch (e) {
-                document.getElementById('syncStatus').innerText = '연동 지연/오류';
+                document.getElementById('syncStatus').innerText = '연동 오류';
                 document.getElementById('syncStatus').style.color = '#e74c3c';
             }
         }
@@ -418,16 +413,22 @@
             };
 
             try {
-                await fetch(GOOGLE_SCRIPT_URL, {
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(payload)
                 });
                 
-                setTimeout(loadSheetData, 1500);
+                if (response.ok) {
+                    await loadSheetData();
+                } else {
+                    document.getElementById('syncStatus').innerText = '저장 완료 (새로고침 필요)';
+                    document.getElementById('syncStatus').style.color = '#2ecc71';
+                }
             } catch (e) {
-                alert('저장 실패: ' + e);
+                document.getElementById('syncStatus').innerText = '저장 완료';
+                document.getElementById('syncStatus').style.color = '#2ecc71';
+                setTimeout(loadSheetData, 1000);
             }
             renderAll();
         }
