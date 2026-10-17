@@ -158,7 +158,7 @@
     <header>
         <div class="title">SOL:Enchant 아이템 분배 관리 시스템</div>
         <div style="display: flex; align-items: center; gap: 10px;">
-            <span id="syncStatus" style="font-size: 0.8rem; color: #2ecc71;">클라우드 연동중</span>
+            <span id="syncStatus" style="font-size: 0.8rem; color: #2ecc71;">로컬 영구저장 활성화</span>
             <span id="roleBadge" style="background:#3498db; padding:5px 10px; border-radius:4px; font-size:0.85rem;">일반 사용자 (조회전용)</span>
             <button id="authBtn" class="btn btn-gold btn-sm" onclick="toggleAuthModal()">관리자 로그인</button>
         </div>
@@ -294,7 +294,7 @@
     <!-- Item Modal -->
     <div id="itemModal" class="modal-overlay">
         <div class="modal">
-            <h3>아이템 분배 등록</h3>
+            <h3 id="itemModalTitle">아이템 분배 등록</h3>
             <input type="hidden" id="itemEditIndex">
             <div class="form-group">
                 <label>케릭명</label>
@@ -318,7 +318,7 @@
     <!-- Dia Modal -->
     <div id="diaModal" class="modal-overlay">
         <div class="modal">
-            <h3>다이아 분배 등록</h3>
+            <h3 id="diaModalTitle">다이아 분배 등록</h3>
             <input type="hidden" id="diaEditIndex">
             <div class="form-group">
                 <label>케릭명</label>
@@ -345,13 +345,12 @@
 
     <script>
         let appState = { isAdmin: false, drops: [], items: [], dias: [] };
-        const BIN_ID = '653fefb50575da5f3a097314'; 
-        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`;
+        const STORAGE_KEY = 'sol_enchant_persistent_data_v7';
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadCloudData();
+            loadLocalData();
             setTodayDates();
-            setInterval(loadCloudData, 3000);
+            renderAll();
         });
 
         function getTodayString() {
@@ -371,58 +370,24 @@
             document.getElementById('dropRevenue').value = Math.round(price * 0.92);
         }
 
-        async function loadCloudData() {
-            try {
-                const response = await fetch(API_URL, {
-                    headers: { 'X-Master-Key': '$2a$10$7X8Kq... (public)' }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && data.record) {
-                        appState.drops = data.record.drops || [];
-                        appState.items = data.record.items || [];
-                        appState.dias = data.record.dias || [];
-                        renderAll();
-                        document.getElementById('syncStatus').innerText = '클라우드 동기화됨';
-                    }
-                }
-            } catch (e) {
-                const stored = localStorage.getItem('sol_enchant_backup');
-                if (stored) {
-                    try {
-                        const parsed = JSON.parse(stored);
-                        appState.drops = parsed.drops || [];
-                        appState.items = parsed.items || [];
-                        appState.dias = parsed.dias || [];
-                        renderAll();
-                    } catch(err) {}
-                }
-                document.getElementById('syncStatus').innerText = '오프라인 모드';
+        function loadLocalData() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    appState.drops = parsed.drops || [];
+                    appState.items = parsed.items || [];
+                    appState.dias = parsed.dias || [];
+                } catch(e) {}
             }
         }
 
-        async function saveCloudData() {
-            const payload = {
+        function saveLocalData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 drops: appState.drops,
                 items: appState.items,
                 dias: appState.dias
-            };
-            
-            localStorage.setItem('sol_enchant_backup', JSON.stringify(payload));
-
-            try {
-                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': '$2a$10$7X8Kq... (public)'
-                    },
-                    body: JSON.stringify(payload)
-                });
-                document.getElementById('syncStatus').innerText = '저장 및 동기화 완료';
-            } catch (e) {
-                document.getElementById('syncStatus').innerText = '저장 완료 (로컬)';
-            }
+            }));
             renderAll();
         }
 
@@ -478,6 +443,7 @@
             }
         }
 
+        // Drops CRUD
         function openDropModal(idx = -1) {
             document.getElementById('dropEditIndex').value = idx;
             if (idx === -1) {
@@ -513,14 +479,15 @@
             if (idx === -1) appState.drops.push(entry);
             else appState.drops[idx] = entry;
 
-            saveCloudData();
+            saveLocalData();
             closeModal('dropModal');
         }
 
         function deleteDrop(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.drops.splice(idx, 1); saveCloudData(); }
+            if (confirm('삭제하시겠습니까?')) { appState.drops.splice(idx, 1); saveLocalData(); }
         }
 
+        // Items CRUD
         function openItemModal(idx = -1) {
             const select = document.getElementById('itemSelect');
             select.innerHTML = '';
@@ -540,9 +507,11 @@
 
             document.getElementById('itemEditIndex').value = idx;
             if (idx === -1) {
+                document.getElementById('itemModalTitle').innerText = '아이템 분배 등록';
                 document.getElementById('itemCharName').value = '';
                 document.getElementById('itemDate').value = getTodayString();
             } else {
+                document.getElementById('itemModalTitle').innerText = '아이템 분배 수정';
                 const it = appState.items[idx];
                 document.getElementById('itemCharName').value = it.charName;
                 document.getElementById('itemDate').value = it.date;
@@ -563,22 +532,25 @@
             if (idx === -1) appState.items.push(entry);
             else appState.items[idx] = entry;
 
-            saveCloudData();
+            saveLocalData();
             closeModal('itemModal');
         }
 
         function deleteItem(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.items.splice(idx, 1); saveCloudData(); }
+            if (confirm('삭제하시겠습니까?')) { appState.items.splice(idx, 1); saveLocalData(); }
         }
 
+        // Diamonds CRUD
         function openDiaModal(idx = -1) {
             document.getElementById('diaEditIndex').value = idx;
             if (idx === -1) {
+                document.getElementById('diaModalTitle').innerText = '다이아 분배 등록';
                 document.getElementById('diaCharName').value = '';
                 document.getElementById('diaAmount').value = '';
                 document.getElementById('diaDate').value = getTodayString();
                 document.getElementById('diaMemo').value = '';
             } else {
+                document.getElementById('diaModalTitle').innerText = '다이아 분배 수정';
                 const d = appState.dias[idx];
                 document.getElementById('diaCharName').value = d.charName;
                 document.getElementById('diaAmount').value = d.amount;
@@ -601,24 +573,25 @@
             if (idx === -1) appState.dias.push(entry);
             else appState.dias[idx] = entry;
 
-            saveCloudData();
+            saveLocalData();
             closeModal('diaModal');
         }
 
         function deleteDia(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.dias.splice(idx, 1); saveCloudData(); }
+            if (confirm('삭제하시겠습니까?')) { appState.dias.splice(idx, 1); saveLocalData(); }
         }
 
         function renderAll() {
             const rev = appState.drops.reduce((sum, d) => sum + (d.revenue || 0), 0);
             const dist = appState.dias.reduce((sum, d) => sum + (d.amount || 0), 0);
             
+            // Dashboard Render
             document.getElementById('totalRevenue').innerText = rev.toLocaleString() + ' 💎';
             document.getElementById('totalDistributedDia').innerText = dist.toLocaleString() + ' 💎';
             document.getElementById('remainingDia').innerText = (rev - dist).toLocaleString() + ' 💎';
             document.getElementById('totalCounts').innerText = `${appState.drops.length}건 / ${appState.items.length}건`;
 
-            // Drops Table (수정 버튼 포함)
+            // Drops Table
             const dropBody = document.getElementById('dropTableBody');
             dropBody.innerHTML = appState.drops.map((d, i) => `
                 <tr>
@@ -638,7 +611,12 @@
             itemBody.innerHTML = appState.items.map((it, i) => `
                 <tr>
                     <td>${it.charName}</td><td>${it.date}</td><td>${it.itemName}</td>
-                    ${appState.isAdmin ? `<td><button class="btn btn-danger btn-sm" onclick="deleteItem(${i})">삭제</button></td>` : ''}
+                    ${appState.isAdmin ? `
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="openItemModal(${i})">수정</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteItem(${i})">삭제</button>
+                        </td>
+                    ` : ''}
                 </tr>
             `).join('') || `<tr><td colspan="${appState.isAdmin ? 4 : 3}">등록된 아이템 분배 내역이 없습니다.</td></tr>`;
 
@@ -647,11 +625,16 @@
             diaBody.innerHTML = appState.dias.map((d, i) => `
                 <tr>
                     <td>${d.charName}</td><td>${d.amount.toLocaleString()}</td><td>${d.date}</td><td>${d.memo || '-'}</td>
-                    ${appState.isAdmin ? `<td><button class="btn btn-danger btn-sm" onclick="deleteDia(${i})">삭제</button></td>` : ''}
+                    ${appState.isAdmin ? `
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="openDiaModal(${i})">수정</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteDia(${i})">삭제</button>
+                        </td>
+                    ` : ''}
                 </tr>
             `).join('') || `<tr><td colspan="${appState.isAdmin ? 5 : 4}">등록된 다이아 분배 내역이 없습니다.</td></tr>`;
 
-            // Admin Buttons Display Toggle
+            // Admin Toggle
             document.querySelectorAll('.admin-only').forEach(el => {
                 el.style.display = appState.isAdmin ? 'inline-block' : 'none';
             });
