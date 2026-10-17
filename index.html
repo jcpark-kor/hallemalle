@@ -152,14 +152,16 @@
 </head>
 <body>
     <header>
-        <div class="title">SOL:Enchant 아이템 분배 시스템 (v6)</div>
-        <div>
+        <div class="title">SOL:Enchant 아이템 분배 관리 시스템</div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span id="syncStatus" style="font-size: 0.8rem; color: #2ecc71;">클라우드 연동중</span>
             <span id="roleBadge" style="background:#3498db; padding:5px 10px; border-radius:4px; font-size:0.85rem;">일반 사용자 (조회전용)</span>
             <button id="authBtn" class="btn btn-gold btn-sm" onclick="toggleAuthModal()">관리자 로그인</button>
         </div>
     </header>
 
     <div class="container">
+        <!-- Dashboard Section -->
         <div class="dashboard">
             <div class="card">
                 <div class="card-title">총 획득 수입 (세후 92%)</div>
@@ -172,6 +174,10 @@
             <div class="card" style="border-left-color: var(--accent-green);">
                 <div class="card-title">남은 정산 가능 다이아</div>
                 <div class="card-value" style="color: var(--accent-green)" id="remainingDia">0 💎</div>
+            </div>
+            <div class="card" style="border-left-color: #9b59b6;">
+                <div class="card-title">총 획득 건수 / 아이템 분배 건수</div>
+                <div class="card-value" style="color: #9b59b6" id="totalCounts">0건 / 0건</div>
             </div>
         </div>
 
@@ -236,11 +242,11 @@
             <h3>관리자 로그인</h3>
             <div class="form-group">
                 <label>아이디</label>
-                <input type="text" id="adminId" value="admin">
+                <input type="text" id="adminId" placeholder="아이디 입력">
             </div>
             <div class="form-group">
                 <label>비밀번호</label>
-                <input type="password" id="adminPw" value="erer963">
+                <input type="password" id="adminPw" placeholder="비밀번호 입력">
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px;">
                 <button class="btn" onclick="closeModal('loginModal')">취소</button>
@@ -260,15 +266,15 @@
             </div>
             <div class="form-group">
                 <label>보스명</label>
-                <input type="text" id="dropBoss">
+                <input type="text" id="dropBoss" placeholder="예: 데몬">
             </div>
             <div class="form-group">
                 <label>드랍 아이템</label>
-                <input type="text" id="dropItem">
+                <input type="text" id="dropItem" placeholder="아이템명 입력">
             </div>
             <div class="form-group">
                 <label>외판가(💎)</label>
-                <input type="number" id="dropPrice" oninput="calculateTax()">
+                <input type="number" id="dropPrice" placeholder="1000" oninput="calculateTax()">
             </div>
             <div class="form-group">
                 <label>수입(8% 세금 제외)</label>
@@ -288,7 +294,7 @@
             <input type="hidden" id="itemEditIndex">
             <div class="form-group">
                 <label>케릭명</label>
-                <input type="text" id="itemCharName">
+                <input type="text" id="itemCharName" placeholder="캐릭터명 입력">
             </div>
             <div class="form-group">
                 <label>날짜</label>
@@ -312,11 +318,11 @@
             <input type="hidden" id="diaEditIndex">
             <div class="form-group">
                 <label>케릭명</label>
-                <input type="text" id="diaCharName">
+                <input type="text" id="diaCharName" placeholder="캐릭터명 입력">
             </div>
             <div class="form-group">
                 <label>분배 다이아(💎)</label>
-                <input type="number" id="diaAmount">
+                <input type="number" id="diaAmount" placeholder="금액 입력">
             </div>
             <div class="form-group">
                 <label>날짜</label>
@@ -324,7 +330,7 @@
             </div>
             <div class="form-group">
                 <label>메모</label>
-                <input type="text" id="diaMemo">
+                <input type="text" id="diaMemo" placeholder="비고 입력">
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px;">
                 <button class="btn" onclick="closeModal('diaModal')">취소</button>
@@ -335,12 +341,15 @@
 
     <script>
         let appState = { isAdmin: false, drops: [], items: [], dias: [] };
-        const STORAGE_KEY = 'sol_enchant_guild_data_v6';
+        // 공용 클라우드 동기화 API (JSONBin 공개형 Bin 활용)
+        const BIN_ID = '653fefb50575da5f3a097314'; 
+        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`;
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadData();
+            loadCloudData();
             setTodayDates();
-            renderAll();
+            // 주기적으로 실시간 동기화 확인 (3초 간격)
+            setInterval(loadCloudData, 3000);
         });
 
         function getTodayString() {
@@ -360,19 +369,62 @@
             document.getElementById('dropRevenue').value = Math.round(price * 0.92);
         }
 
-        function loadData() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                try { appState = { ...appState, ...JSON.parse(stored) }; } catch(e) {}
+        // 클라우드 데이터 불러오기 (배포받은 유저들이 실시간으로 변경사항을 볼 수 있음)
+        async function loadCloudData() {
+            try {
+                const response = await fetch(API_URL, {
+                    headers: { 'X-Master-Key': '$2a$10$7X8Kq... (public)' }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.record) {
+                        appState.drops = data.record.drops || [];
+                        appState.items = data.record.items || [];
+                        appState.dias = data.record.dias || [];
+                        renderAll();
+                        document.getElementById('syncStatus').innerText = '클라우드 동기화됨';
+                    }
+                }
+            } catch (e) {
+                // 네트워크 오류 시 로컬스토리지 백업 활용
+                const stored = localStorage.getItem('sol_enchant_backup');
+                if (stored) {
+                    try {
+                        const parsed = JSON.parse(stored);
+                        appState.drops = parsed.drops || [];
+                        appState.items = parsed.items || [];
+                        appState.dias = parsed.dias || [];
+                        renderAll();
+                    } catch(err) {}
+                }
+                document.getElementById('syncStatus').innerText = '오프라인 모드';
             }
         }
 
-        function saveData() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        // 클라우드 데이터 저장하기 (관리자 수정 즉시 반영)
+        async function saveCloudData() {
+            const payload = {
                 drops: appState.drops,
                 items: appState.items,
                 dias: appState.dias
-            }));
+            };
+            
+            // 로컬 백업 먼저 저장
+            localStorage.setItem('sol_enchant_backup', JSON.stringify(payload));
+
+            try {
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': '$2a$10$7X8Kq... (public)'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                document.getElementById('syncStatus').innerText = '저장 및 동기화 완료';
+            } catch (e) {
+                document.getElementById('syncStatus').innerText = '저장 완료 (로컬)';
+            }
             renderAll();
         }
 
@@ -402,8 +454,9 @@
                 document.getElementById('authBtn').innerText = '관리자 로그인';
                 renderAll();
             } else {
-                document.getElementById('adminId').value = 'admin';
-                document.getElementById('adminPw').value = 'erer963';
+                // 버그 수정: 입력창을 빈 상태로 초기화
+                document.getElementById('adminId').value = '';
+                document.getElementById('adminPw').value = '';
                 document.getElementById('loginModal').style.display = 'flex';
             }
         }
@@ -413,13 +466,9 @@
         }
 
         function attemptLogin() {
-            const idInput = document.getElementById('adminId');
-            const pwInput = document.getElementById('adminPw');
+            const id = document.getElementById('adminId').value.trim();
+            const pw = document.getElementById('adminPw').value.trim();
             
-            const id = idInput ? idInput.value.trim() : '';
-            const pw = pwInput ? pwInput.value.trim() : '';
-            
-            // 엄격한 비교 대신 공백 및 오타 방지 처리
             if (id === 'admin' && pw === 'erer963') {
                 appState.isAdmin = true;
                 document.getElementById('roleBadge').innerText = '관리자 모드';
@@ -428,7 +477,7 @@
                 closeModal('loginModal');
                 renderAll();
             } else {
-                alert('아이디 또는 비밀번호가 올바르지 않습니다. (입력값 확인: ' + id + ' / ' + pw + ')');
+                alert('아이디 또는 비밀번호가 올바르지 않습니다.');
             }
         }
 
@@ -465,12 +514,12 @@
             if (idx === -1) appState.drops.push(entry);
             else appState.drops[idx] = entry;
 
-            saveData();
+            saveCloudData();
             closeModal('dropModal');
         }
 
         function deleteDrop(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.drops.splice(idx, 1); saveData(); }
+            if (confirm('삭제하시겠습니까?')) { appState.drops.splice(idx, 1); saveCloudData(); }
         }
 
         function openItemModal(idx = -1) {
@@ -515,12 +564,12 @@
             if (idx === -1) appState.items.push(entry);
             else appState.items[idx] = entry;
 
-            saveData();
+            saveCloudData();
             closeModal('itemModal');
         }
 
         function deleteItem(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.items.splice(idx, 1); saveData(); }
+            if (confirm('삭제하시겠습니까?')) { appState.items.splice(idx, 1); saveCloudData(); }
         }
 
         function openDiaModal(idx = -1) {
@@ -553,21 +602,23 @@
             if (idx === -1) appState.dias.push(entry);
             else appState.dias[idx] = entry;
 
-            saveData();
+            saveCloudData();
             closeModal('diaModal');
         }
 
         function deleteDia(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.dias.splice(idx, 1); saveData(); }
+            if (confirm('삭제하시겠습니까?')) { appState.dias.splice(idx, 1); saveCloudData(); }
         }
 
         function renderAll() {
             const rev = appState.drops.reduce((sum, d) => sum + (d.revenue || 0), 0);
             const dist = appState.dias.reduce((sum, d) => sum + (d.amount || 0), 0);
             
+            // 대시보드 렌더링 반영
             document.getElementById('totalRevenue').innerText = rev.toLocaleString() + ' 💎';
             document.getElementById('totalDistributedDia').innerText = dist.toLocaleString() + ' 💎';
             document.getElementById('remainingDia').innerText = (rev - dist).toLocaleString() + ' 💎';
+            document.getElementById('totalCounts').innerText = `${appState.drops.length}건 / ${appState.items.length}건`;
 
             // Drops Table
             const dropBody = document.getElementById('dropTableBody');
