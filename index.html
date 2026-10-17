@@ -346,8 +346,8 @@
     <script>
         let appState = { isAdmin: false, drops: [], items: [], dias: [] };
         
-        // ★ 여기에 새로 발급받은 웹 앱 URL을 입력하세요 ★
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycRUkeVRuyJiT8DvuzpMcJBUPXdCKd2unPbBN7kNEVjkis6QGl6yd18NhSBeCeur18ng/exec';
+        // ★ 여기에 구글 앱스 스크립트 웹 앱 URL을 입력하세요 ★
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz5xq3MPIv0O_-eskuhyGEVHDluZ2fZSE0yFXi0U-eAoVlDhQgn0nO4Fs_ZS2LbUFBlug/exec';
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSheetData();
@@ -356,7 +356,10 @@
 
         function getTodayString() {
             const today = new Date();
-            return today.toISOString().split('T')[0];
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
 
         function setTodayDates() {
@@ -371,7 +374,6 @@
             document.getElementById('dropRevenue').value = Math.round(price * 0.92);
         }
 
-        // 구글 시트 데이터 불러오기
         async function loadSheetData() {
             if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes('여기에')) {
                 document.getElementById('syncStatus').innerText = '스크립트 URL 설정 필요';
@@ -388,8 +390,6 @@
                     renderAll();
                     document.getElementById('syncStatus').innerText = '구글 시트 연동됨';
                     document.getElementById('syncStatus').style.color = '#2ecc71';
-                } else {
-                    throw new Error('응답 오류');
                 }
             } catch (e) {
                 document.getElementById('syncStatus').innerText = '연동 오류';
@@ -397,7 +397,6 @@
             }
         }
 
-        // 구글 시트로 데이터 저장하기
         async function saveSheetData() {
             if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes('여기에')) {
                 return alert('Google Script URL을 세팅해 주세요.');
@@ -413,18 +412,12 @@
             };
 
             try {
-                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                await fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(payload)
                 });
-                
-                if (response.ok) {
-                    await loadSheetData();
-                } else {
-                    document.getElementById('syncStatus').innerText = '저장 완료 (새로고침 필요)';
-                    document.getElementById('syncStatus').style.color = '#2ecc71';
-                }
+                await loadSheetData();
             } catch (e) {
                 document.getElementById('syncStatus').innerText = '저장 완료';
                 document.getElementById('syncStatus').style.color = '#2ecc71';
