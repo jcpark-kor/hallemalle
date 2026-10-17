@@ -158,7 +158,7 @@
     <header>
         <div class="title">SOL:Enchant 아이템 분배 관리 시스템</div>
         <div style="display: flex; align-items: center; gap: 10px;">
-            <span id="syncStatus" style="font-size: 0.8rem; color: #2ecc71;">로컬 동기화 완료</span>
+            <span id="syncStatus" style="font-size: 0.8rem; color: #f39c12;">시트 연결중...</span>
             <span id="roleBadge" style="background:#3498db; padding:5px 10px; border-radius:4px; font-size:0.85rem;">일반 사용자 (조회전용)</span>
             <button id="authBtn" class="btn btn-gold btn-sm" onclick="toggleAuthModal()">관리자 로그인</button>
         </div>
@@ -345,12 +345,15 @@
 
     <script>
         let appState = { isAdmin: false, drops: [], items: [], dias: [] };
-        const STORAGE_KEY = 'sol_enchant_guild_master_v9';
+        
+        // ★ 구글 앱스 스크립트 웹 앱 URL을 여기에 입력하세요 ★
+        const GOOGLE_SCRIPT_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL';
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadLocalData();
+            loadSheetData();
             setTodayDates();
-            renderAll();
+            // 5초마다 구글 시트 데이터 실시간 자동 동기화
+            setInterval(loadSheetData, 5000);
         });
 
         function getTodayString() {
@@ -370,275 +373,24 @@
             document.getElementById('dropRevenue').value = Math.round(price * 0.92);
         }
 
-        function loadLocalData() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                try {
-                    const parsed = JSON.parse(stored);
-                    appState.drops = parsed.drops || [];
-                    appState.items = parsed.items || [];
-                    appState.dias = parsed.dias || [];
-                } catch(e) {}
+        // 구글 시트 데이터 불러오기
+        async function loadSheetData() {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+                document.getElementById('syncStatus').innerText = '스크립트 URL 설정 필요';
+                document.getElementById('syncStatus').style.color = '#e74c3c';
+                return;
             }
-        }
-
-        function saveLocalData() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                drops: appState.drops,
-                items: appState.items,
-                dias: appState.dias
-            }));
-            renderAll();
-        }
-
-        function switchTab(tab, event) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById('dropsTab').style.display = 'none';
-            document.getElementById('itemsTab').style.display = 'none';
-            document.getElementById('diasTab').style.display = 'none';
-
-            if (tab === 'drops') {
-                document.getElementById('dropsTab').style.display = 'block';
-                if (event) event.target.classList.add('active');
-            } else if (tab === 'items') {
-                document.getElementById('itemsTab').style.display = 'block';
-                if (event) event.target.classList.add('active');
-            } else if (tab === 'dias') {
-                document.getElementById('diasTab').style.display = 'block';
-                if (event) event.target.classList.add('active');
-            }
-        }
-
-        function toggleAuthModal() {
-            if (appState.isAdmin) {
-                appState.isAdmin = false;
-                document.getElementById('roleBadge').innerText = '일반 사용자 (조회전용)';
-                document.getElementById('roleBadge').style.background = '#3498db';
-                document.getElementById('authBtn').innerText = '관리자 로그인';
-                renderAll();
-            } else {
-                document.getElementById('adminId').value = '';
-                document.getElementById('adminPw').value = '';
-                document.getElementById('loginModal').style.display = 'flex';
-            }
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-        }
-
-        function attemptLogin() {
-            const id = document.getElementById('adminId').value.trim();
-            const pw = document.getElementById('adminPw').value.trim();
-            
-            if (id === 'admin' && pw === 'erer963') {
-                appState.isAdmin = true;
-                document.getElementById('roleBadge').innerText = '관리자 모드';
-                document.getElementById('roleBadge').style.background = '#f39c12';
-                document.getElementById('authBtn').innerText = '로그아웃';
-                closeModal('loginModal');
-                renderAll();
-            } else {
-                alert('아이디 또는 비밀번호가 올바르지 않습니다.');
-            }
-        }
-
-        // Drops CRUD (추가 및 수정)
-        function openDropModal(idx = -1) {
-            document.getElementById('dropEditIndex').value = idx;
-            if (idx === -1) {
-                document.getElementById('dropModalTitle').innerText = '획득 내역 추가';
-                document.getElementById('dropDate').value = getTodayString();
-                document.getElementById('dropBoss').value = '';
-                document.getElementById('dropItem').value = '';
-                document.getElementById('dropPrice').value = '';
-                document.getElementById('dropRevenue').value = '';
-            } else {
-                document.getElementById('dropModalTitle').innerText = '획득 내역 수정';
-                const d = appState.drops[idx];
-                document.getElementById('dropDate').value = d.date;
-                document.getElementById('dropBoss').value = d.boss;
-                document.getElementById('dropItem').value = d.item;
-                document.getElementById('dropPrice').value = d.price;
-                document.getElementById('dropRevenue').value = d.revenue;
-            }
-            document.getElementById('dropModal').style.display = 'flex';
-        }
-
-        function saveDropEntry() {
-            const idx = parseInt(document.getElementById('dropEditIndex').value);
-            const date = document.getElementById('dropDate').value || getTodayString();
-            const boss = document.getElementById('dropBoss').value.trim();
-            const item = document.getElementById('dropItem').value.trim();
-            const price = parseFloat(document.getElementById('dropPrice').value) || 0;
-            const revenue = Math.round(price * 0.92);
-
-            if (!boss || !item) return alert('보스명과 아이템명을 입력해주세요.');
-
-            const entry = { date, boss, item, price, revenue };
-            if (idx === -1) appState.drops.push(entry);
-            else appState.drops[idx] = entry;
-
-            saveLocalData();
-            closeModal('dropModal');
-        }
-
-        function deleteDrop(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.drops.splice(idx, 1); saveLocalData(); }
-        }
-
-        // Items CRUD (추가 및 수정)
-        function openItemModal(idx = -1) {
-            const select = document.getElementById('itemSelect');
-            select.innerHTML = '';
-            if (appState.drops.length === 0) {
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = '등록된 획득 아이템이 없습니다';
-                select.appendChild(opt);
-            } else {
-                appState.drops.forEach(d => {
-                    const opt = document.createElement('option');
-                    opt.value = d.item;
-                    opt.textContent = `${d.item} (${d.boss} - ${d.date})`;
-                    select.appendChild(opt);
-                });
-            }
-
-            document.getElementById('itemEditIndex').value = idx;
-            if (idx === -1) {
-                document.getElementById('itemModalTitle').innerText = '아이템 분배 등록';
-                document.getElementById('itemCharName').value = '';
-                document.getElementById('itemDate').value = getTodayString();
-            } else {
-                document.getElementById('itemModalTitle').innerText = '아이템 분배 수정';
-                const it = appState.items[idx];
-                document.getElementById('itemCharName').value = it.charName;
-                document.getElementById('itemDate').value = it.date;
-                document.getElementById('itemSelect').value = it.itemName;
-            }
-            document.getElementById('itemModal').style.display = 'flex';
-        }
-
-        function saveItemEntry() {
-            const idx = parseInt(document.getElementById('itemEditIndex').value);
-            const charName = document.getElementById('itemCharName').value.trim();
-            const date = document.getElementById('itemDate').value || getTodayString();
-            const itemName = document.getElementById('itemSelect').value;
-
-            if (!charName || !itemName) return alert('캐릭터명과 아이템을 선택해주세요.');
-
-            const entry = { charName, date, itemName };
-            if (idx === -1) appState.items.push(entry);
-            else appState.items[idx] = entry;
-
-            saveLocalData();
-            closeModal('itemModal');
-        }
-
-        function deleteItem(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.items.splice(idx, 1); saveLocalData(); }
-        }
-
-        // Diamonds CRUD (추가 및 수정)
-        function openDiaModal(idx = -1) {
-            document.getElementById('diaEditIndex').value = idx;
-            if (idx === -1) {
-                document.getElementById('diaModalTitle').innerText = '다이아 분배 등록';
-                document.getElementById('diaCharName').value = '';
-                document.getElementById('diaAmount').value = '';
-                document.getElementById('diaDate').value = getTodayString();
-                document.getElementById('diaMemo').value = '';
-            } else {
-                document.getElementById('diaModalTitle').innerText = '다이아 분배 수정';
-                const d = appState.dias[idx];
-                document.getElementById('diaCharName').value = d.charName;
-                document.getElementById('diaAmount').value = d.amount;
-                document.getElementById('diaDate').value = d.date;
-                document.getElementById('diaMemo').value = d.memo || '';
-            }
-            document.getElementById('diaModal').style.display = 'flex';
-        }
-
-        function saveDiaEntry() {
-            const idx = parseInt(document.getElementById('diaEditIndex').value);
-            const charName = document.getElementById('diaCharName').value.trim();
-            const amount = parseFloat(document.getElementById('diaAmount').value) || 0;
-            const date = document.getElementById('diaDate').value || getTodayString();
-            const memo = document.getElementById('diaMemo').value.trim();
-
-            if (!charName || amount <= 0) return alert('캐릭터명과 금액을 입력해주세요.');
-
-            const entry = { charName, amount, date, memo };
-            if (idx === -1) appState.dias.push(entry);
-            else appState.dias[idx] = entry;
-
-            saveLocalData();
-            closeModal('diaModal');
-        }
-
-        function deleteDia(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.dias.splice(idx, 1); saveLocalData(); }
-        }
-
-        function renderAll() {
-            const rev = appState.drops.reduce((sum, d) => sum + (d.revenue || 0), 0);
-            const dist = appState.dias.reduce((sum, d) => sum + (d.amount || 0), 0);
-            
-            // Dashboard Render
-            document.getElementById('totalRevenue').innerText = rev.toLocaleString() + ' 💎';
-            document.getElementById('totalDistributedDia').innerText = dist.toLocaleString() + ' 💎';
-            document.getElementById('remainingDia').innerText = (rev - dist).toLocaleString() + ' 💎';
-            document.getElementById('totalCounts').innerText = `${appState.drops.length}건 / ${appState.items.length}건`;
-
-            // Drops Table
-            const dropBody = document.getElementById('dropTableBody');
-            dropBody.innerHTML = appState.drops.map((d, i) => `
-                <tr>
-                    <td>${d.date}</td><td>${d.boss}</td><td>${d.item}</td>
-                    <td>${d.price.toLocaleString()}</td><td>${d.revenue.toLocaleString()}</td>
-                    ${appState.isAdmin ? `
-                        <td>
-                            <button class="btn btn-warning btn-sm" onclick="openDropModal(${i})">수정</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteDrop(${i})">삭제</button>
-                        </td>
-                    ` : ''}
-                </tr>
-            `).join('') || `<tr><td colspan="${appState.isAdmin ? 6 : 5}">등록된 획득 내역이 없습니다.</td></tr>`;
-
-            // Items Table
-            const itemBody = document.getElementById('itemTableBody');
-            itemBody.innerHTML = appState.items.map((it, i) => `
-                <tr>
-                    <td>${it.charName}</td><td>${it.date}</td><td>${it.itemName}</td>
-                    ${appState.isAdmin ? `
-                        <td>
-                            <button class="btn btn-warning btn-sm" onclick="openItemModal(${i})">수정</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteItem(${i})">삭제</button>
-                        </td>
-                    ` : ''}
-                </tr>
-            `).join('') || `<tr><td colspan="${appState.isAdmin ? 4 : 3}">등록된 아이템 분배 내역이 없습니다.</td></tr>`;
-
-            // Dias Table
-            const diaBody = document.getElementById('diaTableBody');
-            diaBody.innerHTML = appState.dias.map((d, i) => `
-                <tr>
-                    <td>${d.charName}</td><td>${d.amount.toLocaleString()}</td><td>${d.date}</td><td>${d.memo || '-'}</td>
-                    ${appState.isAdmin ? `
-                        <td>
-                            <button class="btn btn-warning btn-sm" onclick="openDiaModal(${i})">수정</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteDia(${i})">삭제</button>
-                        </td>
-                    ` : ''}
-                </tr>
-            `).join('') || `<tr><td colspan="${appState.isAdmin ? 5 : 4}">등록된 다이아 분배 내역이 없습니다.</td></tr>`;
-
-            // Admin Toggle
-            document.querySelectorAll('.admin-only').forEach(el => {
-                el.style.display = appState.isAdmin ? 'inline-block' : 'none';
-            });
-        }
-    </script>
-</body>
-</html>
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL);
+                if (response.ok) {
+                    const data = await response.json();
+                    appState.drops = data.drops || [];
+                    appState.items = data.items || [];
+                    appState.dias = data.dias || [];
+                    renderAll();
+                    document.getElementById('syncStatus').innerText = '구글 시트 연동됨';
+                    document.getElementById('syncStatus').style.color = '#2ecc71';
+                }
+            } catch (e) {
+                document.getElementById('syncStatus').innerText = '동기화 오류';
+                document.getElementById('syncStatus').style.color = '#e74c
