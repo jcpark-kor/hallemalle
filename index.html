@@ -152,7 +152,7 @@
 </head>
 <body>
     <header>
-        <div class="title">SOL:Enchant 아이템 분배 시스템</div>
+        <div class="title">SOL:Enchant 아이템 분배 시스템 (v6)</div>
         <div>
             <span id="roleBadge" style="background:#3498db; padding:5px 10px; border-radius:4px; font-size:0.85rem;">일반 사용자 (조회전용)</span>
             <button id="authBtn" class="btn btn-gold btn-sm" onclick="toggleAuthModal()">관리자 로그인</button>
@@ -236,11 +236,11 @@
             <h3>관리자 로그인</h3>
             <div class="form-group">
                 <label>아이디</label>
-                <input type="text" id="adminId" placeholder="admin">
+                <input type="text" id="adminId" value="admin">
             </div>
             <div class="form-group">
                 <label>비밀번호</label>
-                <input type="password" id="adminPw" placeholder="erer963">
+                <input type="password" id="adminPw" value="erer963">
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px;">
                 <button class="btn" onclick="closeModal('loginModal')">취소</button>
@@ -335,7 +335,7 @@
 
     <script>
         let appState = { isAdmin: false, drops: [], items: [], dias: [] };
-        const STORAGE_KEY = 'sol_enchant_guild_data_v5';
+        const STORAGE_KEY = 'sol_enchant_guild_data_v6';
 
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
@@ -402,8 +402,8 @@
                 document.getElementById('authBtn').innerText = '관리자 로그인';
                 renderAll();
             } else {
-                document.getElementById('adminId').value = '';
-                document.getElementById('adminPw').value = '';
+                document.getElementById('adminId').value = 'admin';
+                document.getElementById('adminPw').value = 'erer963';
                 document.getElementById('loginModal').style.display = 'flex';
             }
         }
@@ -413,10 +413,13 @@
         }
 
         function attemptLogin() {
-            const id = document.getElementById('adminId').value.trim();
-            const pw = document.getElementById('adminPw').value.trim();
+            const idInput = document.getElementById('adminId');
+            const pwInput = document.getElementById('adminPw');
             
-            // 명시된 관리자 정보 체크 (admin / erer963)
+            const id = idInput ? idInput.value.trim() : '';
+            const pw = pwInput ? pwInput.value.trim() : '';
+            
+            // 엄격한 비교 대신 공백 및 오타 방지 처리
             if (id === 'admin' && pw === 'erer963') {
                 appState.isAdmin = true;
                 document.getElementById('roleBadge').innerText = '관리자 모드';
@@ -425,7 +428,7 @@
                 closeModal('loginModal');
                 renderAll();
             } else {
-                alert('아이디 또는 비밀번호가 올바르지 않습니다.');
+                alert('아이디 또는 비밀번호가 올바르지 않습니다. (입력값 확인: ' + id + ' / ' + pw + ')');
             }
         }
 
