@@ -527,21 +527,28 @@
             const select = document.getElementById('itemSelect');
             select.innerHTML = '';
             
-            // 이미 분배된 아이템 이름 목록 정규화
-            const distributedItems = new Set(appState.items.map(it => String(it.itemName || '').trim()));
+            // 1. 이미 '아이템 분배내역'에 등록된 모든 아이템명을 공백 제거 후 Set에 저장
+            const distributedItems = new Set(
+                appState.items.map(it => String(it.itemName || '').trim())
+            );
             
-            // 분배되지 않았고(distributedItems에 없음) AND 외판가(price)가 0인(판매완료되지 않은) 미분배 아이템만 필터링
-            const availableDrops = appState.drops.filter(d => {
+            // 2. 획득 내역 중에서 아래 조건을 만족하는 항목만 철저하게 필터링
+            //    - 이미 분배된 아이템(distributedItems에 존재) -> 제외
+            //    - 외판가(price)가 0보다 큰 판매완료된 아이템(Number(d.price) > 0) -> 제외
+            //    - 단, 현재 수정 중인 기존 아이템은 예외적으로 선택 가능하게 허용
+            const availableDrops = appState.drops.filter((d, dIndex) => {
                 const itemName = String(d.item || '').trim();
-                // 수정 중인 항목의 기존 아이템은 예외적으로 포함
+                
+                // 수정 모드일 때 현재 선택되어 있는 기존 아이템은 유지
                 if (idx !== -1 && appState.items[idx] && String(appState.items[idx].itemName || '').trim() === itemName) {
                     return true;
                 }
-                const isDistributed = distributedItems.has(itemName);
-                const isSold = Number(d.price) > 0;
                 
-                // 분배도 안 되었고 판매도 안 된(미분배) 항목만 허용
-                return !isDistributed && !isSold;
+                const isAlreadyDistributed = distributedItems.has(itemName);
+                const isAlreadySold = (Number(d.price) || 0) > 0;
+                
+                // 분배도 안 되었고 판매도 안 된(미분배) 아이템만 통과!
+                return !isAlreadyDistributed && !isAlreadySold;
             });
 
             if (availableDrops.length === 0) {
@@ -617,3 +624,100 @@
             const idx = parseInt(document.getElementById('diaEditIndex').value);
             const charName = document.getElementById('diaCharName').value.trim();
             const amount = parseFloat(document.getElementById('diaAmount').value) || 0;
+            const date = document.getElementById('diaDate').value || getTodayString();
+            const memo = document.getElementById('diaMemo').value.trim();
+
+            if (!charName || amount <= 0) return alert('캐릭터명과 금액을 입력해주세요.');
+
+            const entry = { charName, amount, date, memo };
+            if (idx === -1) appState.dias.push(entry);
+            else appState.dias[idx] = entry;
+
+            saveSheetData();
+            closeModal('diaModal');
+        }
+
+        function deleteDia(idx) {
+            if (confirm('삭제하시겠습니까?')) { appState.dias.splice(idx, 1); saveSheetData(); }
+        }
+
+        function renderAll() {
+            const rev = appState.drops.reduce((sum, d) => sum + (d.revenue || 0), 0);
+            const dist = appState.dias.reduce((sum, d) => sum + (d.amount || 0), 0);
+            
+            // Dashboard Render
+            document.getElementById('totalRevenue').innerText = rev.toLocaleString() + ' 💎';
+            document.getElementById('totalDistributedDia').innerText = dist.toLocaleString() + ' 💎';
+            document.getElementById('remainingDia').innerText = (rev - dist).toLocaleString() + ' 💎';
+            document.getElementById('totalCounts').innerText = `${appState.drops.length}건 / ${appState.items.length}건`;
+
+            // 분배된 아이템 이름 목록 정규화
+            const distributedItems = new Set(appState.items.map(it => String(it.itemName || '').trim()));
+
+            // Drops Table
+            const dropBody = document.getElementById('dropTableBody');
+            dropBody.innerHTML = appState.drops.map((d, i) => {
+                const cleanItemName = String(d.item || '').trim();
+                const isDistributed = distributedItems.has(cleanItemName);
+                
+                let statusBadge = '<span style="color: #a0aec0;">미분배</span>';
+                if (isDistributed) {
+                    statusBadge = '<span style="color: var(--accent-green); font-weight: bold;">분배완료</span>';
+                } else if ((Number(d.price) || 0) > 0) {
+                    statusBadge = '<span style="color: var(--accent-blue); font-weight: bold;">판매완료</span>';
+                }
+
+                return `
+                    <tr>
+                        <td>${d.date}</td>
+                        <td>${d.boss}</td>
+                        <td>${d.item}</td>
+                        <td>${statusBadge}</td>
+                        <td>${Number(d.price).toLocaleString()}</td>
+                        <td>${Number(d.revenue).toLocaleString()}</td>
+                        ${appState.isAdmin ? `
+                            <td>
+                                <button class="btn btn-warning btn-sm" onclick="openDropModal(${i})">수정</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteDrop(${i})">삭제</button>
+                            </td>
+                        ` : ''}
+                    </tr>
+                `;
+            }).join('') || `<tr><td colspan="${appState.isAdmin ? 7 : 6}">등록된 획득 내역이 없습니다.</td></tr>`;
+
+            // Items Table
+            const itemBody = document.getElementById('itemTableBody');
+            itemBody.innerHTML = appState.items.map((it, i) => `
+                <tr>
+                    <td>${it.charName}</td><td>${it.date}</td><td>${it.itemName}</td>
+                    ${appState.isAdmin ? `
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="openItemModal(${i})">수정</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteItem(${i})">삭제</button>
+                        </td>
+                    ` : ''}
+                </tr>
+            `).join('') || `<tr><td colspan="${appState.isAdmin ? 4 : 3}">등록된 아이템 분배 내역이 없습니다.</td></tr>`;
+
+            // Dias Table
+            const diaBody = document.getElementById('diaTableBody');
+            diaBody.innerHTML = appState.dias.map((d, i) => `
+                <tr>
+                    <td>${d.charName}</td><td>${Number(d.amount).toLocaleString()}</td><td>${d.date}</td><td>${d.memo || '-'}</td>
+                    ${appState.isAdmin ? `
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="openDiaModal(${i})">수정</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteDia(${i})">삭제</button>
+                        </td>
+                    ` : ''}
+                </tr>
+            `).join('') || `<tr><td colspan="${appState.isAdmin ? 5 : 4}">등록된 다이아 분배 내역이 없습니다.</td></tr>`;
+
+            // Admin Toggle Visibility
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = appState.isAdmin ? 'inline-block' : 'none';
+            });
+        }
+    </script>
+</body>
+</html>
