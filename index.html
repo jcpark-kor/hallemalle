@@ -111,6 +111,10 @@
             padding: 4px 8px;
             font-size: 0.8rem;
         }
+        .btn-warning {
+            background-color: #f39c12;
+            color: #000;
+        }
         .btn-danger {
             background-color: var(--accent-red);
             color: #fff;
@@ -341,14 +345,12 @@
 
     <script>
         let appState = { isAdmin: false, drops: [], items: [], dias: [] };
-        // 공용 클라우드 동기화 API (JSONBin 공개형 Bin 활용)
         const BIN_ID = '653fefb50575da5f3a097314'; 
         const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}/latest`;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadCloudData();
             setTodayDates();
-            // 주기적으로 실시간 동기화 확인 (3초 간격)
             setInterval(loadCloudData, 3000);
         });
 
@@ -369,7 +371,6 @@
             document.getElementById('dropRevenue').value = Math.round(price * 0.92);
         }
 
-        // 클라우드 데이터 불러오기 (배포받은 유저들이 실시간으로 변경사항을 볼 수 있음)
         async function loadCloudData() {
             try {
                 const response = await fetch(API_URL, {
@@ -386,7 +387,6 @@
                     }
                 }
             } catch (e) {
-                // 네트워크 오류 시 로컬스토리지 백업 활용
                 const stored = localStorage.getItem('sol_enchant_backup');
                 if (stored) {
                     try {
@@ -401,7 +401,6 @@
             }
         }
 
-        // 클라우드 데이터 저장하기 (관리자 수정 즉시 반영)
         async function saveCloudData() {
             const payload = {
                 drops: appState.drops,
@@ -409,7 +408,6 @@
                 dias: appState.dias
             };
             
-            // 로컬 백업 먼저 저장
             localStorage.setItem('sol_enchant_backup', JSON.stringify(payload));
 
             try {
@@ -454,7 +452,6 @@
                 document.getElementById('authBtn').innerText = '관리자 로그인';
                 renderAll();
             } else {
-                // 버그 수정: 입력창을 빈 상태로 초기화
                 document.getElementById('adminId').value = '';
                 document.getElementById('adminPw').value = '';
                 document.getElementById('loginModal').style.display = 'flex';
@@ -484,12 +481,14 @@
         function openDropModal(idx = -1) {
             document.getElementById('dropEditIndex').value = idx;
             if (idx === -1) {
+                document.getElementById('dropModalTitle').innerText = '획득 내역 추가';
                 document.getElementById('dropDate').value = getTodayString();
                 document.getElementById('dropBoss').value = '';
                 document.getElementById('dropItem').value = '';
                 document.getElementById('dropPrice').value = '';
                 document.getElementById('dropRevenue').value = '';
             } else {
+                document.getElementById('dropModalTitle').innerText = '획득 내역 수정';
                 const d = appState.drops[idx];
                 document.getElementById('dropDate').value = d.date;
                 document.getElementById('dropBoss').value = d.boss;
@@ -614,19 +613,23 @@
             const rev = appState.drops.reduce((sum, d) => sum + (d.revenue || 0), 0);
             const dist = appState.dias.reduce((sum, d) => sum + (d.amount || 0), 0);
             
-            // 대시보드 렌더링 반영
             document.getElementById('totalRevenue').innerText = rev.toLocaleString() + ' 💎';
             document.getElementById('totalDistributedDia').innerText = dist.toLocaleString() + ' 💎';
             document.getElementById('remainingDia').innerText = (rev - dist).toLocaleString() + ' 💎';
             document.getElementById('totalCounts').innerText = `${appState.drops.length}건 / ${appState.items.length}건`;
 
-            // Drops Table
+            // Drops Table (수정 버튼 포함)
             const dropBody = document.getElementById('dropTableBody');
             dropBody.innerHTML = appState.drops.map((d, i) => `
                 <tr>
                     <td>${d.date}</td><td>${d.boss}</td><td>${d.item}</td>
                     <td>${d.price.toLocaleString()}</td><td>${d.revenue.toLocaleString()}</td>
-                    ${appState.isAdmin ? `<td><button class="btn btn-danger btn-sm" onclick="deleteDrop(${i})">삭제</button></td>` : ''}
+                    ${appState.isAdmin ? `
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="openDropModal(${i})">수정</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteDrop(${i})">삭제</button>
+                        </td>
+                    ` : ''}
                 </tr>
             `).join('') || `<tr><td colspan="${appState.isAdmin ? 6 : 5}">등록된 획득 내역이 없습니다.</td></tr>`;
 
