@@ -180,7 +180,7 @@
                 <div class="card-value" style="color: var(--accent-green)" id="remainingDia">0 💎</div>
             </div>
             <div class="card" style="border-left-color: #9b59b6;">
-                <div class="card-title">총 획득 건수 / 아이템 분배 건수</div>
+                <div class="card-title">총 획득 건수 / 분배 및 판매 완료 건수</div>
                 <div class="card-value" style="color: #9b59b6" id="totalCounts">0건 / 0건</div>
             </div>
         </div>
@@ -527,26 +527,18 @@
             const select = document.getElementById('itemSelect');
             select.innerHTML = '';
             
-            // 이미 '아이템 분배내역'에 등록된 아이템 이름 목록 Set 구성
             const distributedItems = new Set(
                 appState.items.map(it => String(it.itemName || '').trim())
             );
             
-            // [핵심 필터링 수정] 
-            // 1. 이미 분배된 아이템(distributedItems에 존재) -> 제외
-            // 2. 외판가(price)가 0보다 큰 판매완료 아이템(Number(d.price) > 0) -> 제외
             const availableDrops = appState.drops.filter(d => {
                 const itemName = String(d.item || '').trim();
-                
-                // 수정 모드일 때 현재 수정 중인 기존 아이템은 예외적으로 포함
                 if (idx !== -1 && appState.items[idx] && String(appState.items[idx].itemName || '').trim() === itemName) {
                     return true;
                 }
-                
                 const isDistributed = distributedItems.has(itemName);
                 const isSold = (Number(d.price) || 0) > 0;
                 
-                // 분배도 안 되었고(false) 판매도 안 된(false) 아이템만 통과!
                 return !isDistributed && !isSold;
             });
 
@@ -644,14 +636,26 @@
             const rev = appState.drops.reduce((sum, d) => sum + (d.revenue || 0), 0);
             const dist = appState.dias.reduce((sum, d) => sum + (d.amount || 0), 0);
             
+            // 총 획득 건수
+            const totalDropsCount = appState.drops.length;
+
+            // 판매완료 건수 계산 (외판가 > 0 이면서 아이템 분배내역에 등록되지 않은 항목)
+            const distributedItems = new Set(appState.items.map(it => String(it.itemName || '').trim()));
+            const soldCount = appState.drops.filter(d => {
+                const itemName = String(d.item || '').trim();
+                const isDistributed = distributedItems.has(itemName);
+                const isSold = (Number(d.price) || 0) > 0;
+                return !isDistributed && isSold;
+            }).length;
+
+            // 분배 및 판매 완료 건수 = 아이템 분배내역 건수 + 판매완료 건수
+            const completedCount = appState.items.length + soldCount;
+
             // Dashboard Render
             document.getElementById('totalRevenue').innerText = rev.toLocaleString() + ' 💎';
             document.getElementById('totalDistributedDia').innerText = dist.toLocaleString() + ' 💎';
             document.getElementById('remainingDia').innerText = (rev - dist).toLocaleString() + ' 💎';
-            document.getElementById('totalCounts').innerText = `${appState.drops.length}건 / ${appState.items.length}건`;
-
-            // 분배된 아이템 이름 목록 정규화
-            const distributedItems = new Set(appState.items.map(it => String(it.itemName || '').trim()));
+            document.getElementById('totalCounts').innerText = `${totalDropsCount}건 / ${completedCount}건`;
 
             // Drops Table
             const dropBody = document.getElementById('dropTableBody');
