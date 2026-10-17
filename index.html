@@ -532,7 +532,6 @@
             
             // 분배되지 않은 아이템만 필터링
             const availableDrops = appState.drops.filter(d => {
-                // 수정 중인 항목의 기존 아이템은 목록에 다시 포함시켜야 하므로 예외 처리
                 if (idx !== -1 && appState.items[idx] && appState.items[idx].itemName === d.item) {
                     return true;
                 }
@@ -646,10 +645,14 @@
             const dropBody = document.getElementById('dropTableBody');
             dropBody.innerHTML = appState.drops.map((d, i) => {
                 const cleanItemName = String(d.item || '').trim();
-                const isDone = distributedItems.has(cleanItemName);
-                const statusBadge = isDone 
-                    ? '<span style="color: var(--accent-green); font-weight: bold;">분배완료</span>' 
-                    : '<span style="color: #a0aec0;">미분배</span>';
+                const isDistributed = distributedItems.has(cleanItemName);
+                
+                let statusBadge = '<span style="color: #a0aec0;">미분배</span>';
+                if (isDistributed) {
+                    statusBadge = '<span style="color: var(--accent-green); font-weight: bold;">분배완료</span>';
+                } else if (Number(d.price) > 0) {
+                    statusBadge = '<span style="color: var(--accent-blue); font-weight: bold;">판매완료</span>';
+                }
 
                 return `
                     <tr>
