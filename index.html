@@ -527,15 +527,17 @@
             const select = document.getElementById('itemSelect');
             select.innerHTML = '';
             
-            // 이미 분배된 아이템 이름 목록 추출
+            // 이미 아이템 분배내역에 등록된 아이템 이름 목록 정규화
             const distributedItems = new Set(appState.items.map(it => String(it.itemName || '').trim()));
             
-            // 분배되지 않은 아이템만 필터링
+            // 분배되지 않은 아이템만 필터링하여 선택 리스트 구성
             const availableDrops = appState.drops.filter(d => {
-                if (idx !== -1 && appState.items[idx] && appState.items[idx].itemName === d.item) {
+                const itemName = String(d.item || '').trim();
+                // 현재 수정 중인 항목의 기존 아이템은 예외적으로 포함
+                if (idx !== -1 && appState.items[idx] && String(appState.items[idx].itemName || '').trim() === itemName) {
                     return true;
                 }
-                return !distributedItems.has(String(d.item || '').trim());
+                return !distributedItems.has(itemName);
             });
 
             if (availableDrops.length === 0) {
@@ -625,86 +627,4 @@
         }
 
         function deleteDia(idx) {
-            if (confirm('삭제하시겠습니까?')) { appState.dias.splice(idx, 1); saveSheetData(); }
-        }
-
-        function renderAll() {
-            const rev = appState.drops.reduce((sum, d) => sum + (d.revenue || 0), 0);
-            const dist = appState.dias.reduce((sum, d) => sum + (d.amount || 0), 0);
-            
-            // Dashboard Render
-            document.getElementById('totalRevenue').innerText = rev.toLocaleString() + ' 💎';
-            document.getElementById('totalDistributedDia').innerText = dist.toLocaleString() + ' 💎';
-            document.getElementById('remainingDia').innerText = (rev - dist).toLocaleString() + ' 💎';
-            document.getElementById('totalCounts').innerText = `${appState.drops.length}건 / ${appState.items.length}건`;
-
-            // 분배된 아이템 이름 목록 정규화
-            const distributedItems = new Set(appState.items.map(it => String(it.itemName || '').trim()));
-
-            // Drops Table
-            const dropBody = document.getElementById('dropTableBody');
-            dropBody.innerHTML = appState.drops.map((d, i) => {
-                const cleanItemName = String(d.item || '').trim();
-                const isDistributed = distributedItems.has(cleanItemName);
-                
-                let statusBadge = '<span style="color: #a0aec0;">미분배</span>';
-                if (isDistributed) {
-                    statusBadge = '<span style="color: var(--accent-green); font-weight: bold;">분배완료</span>';
-                } else if (Number(d.price) > 0) {
-                    statusBadge = '<span style="color: var(--accent-blue); font-weight: bold;">판매완료</span>';
-                }
-
-                return `
-                    <tr>
-                        <td>${d.date}</td>
-                        <td>${d.boss}</td>
-                        <td>${d.item}</td>
-                        <td>${statusBadge}</td>
-                        <td>${Number(d.price).toLocaleString()}</td>
-                        <td>${Number(d.revenue).toLocaleString()}</td>
-                        ${appState.isAdmin ? `
-                            <td>
-                                <button class="btn btn-warning btn-sm" onclick="openDropModal(${i})">수정</button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteDrop(${i})">삭제</button>
-                            </td>
-                        ` : ''}
-                    </tr>
-                `;
-            }).join('') || `<tr><td colspan="${appState.isAdmin ? 7 : 6}">등록된 획득 내역이 없습니다.</td></tr>`;
-
-            // Items Table
-            const itemBody = document.getElementById('itemTableBody');
-            itemBody.innerHTML = appState.items.map((it, i) => `
-                <tr>
-                    <td>${it.charName}</td><td>${it.date}</td><td>${it.itemName}</td>
-                    ${appState.isAdmin ? `
-                        <td>
-                            <button class="btn btn-warning btn-sm" onclick="openItemModal(${i})">수정</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteItem(${i})">삭제</button>
-                        </td>
-                    ` : ''}
-                </tr>
-            `).join('') || `<tr><td colspan="${appState.isAdmin ? 4 : 3}">등록된 아이템 분배 내역이 없습니다.</td></tr>`;
-
-            // Dias Table
-            const diaBody = document.getElementById('diaTableBody');
-            diaBody.innerHTML = appState.dias.map((d, i) => `
-                <tr>
-                    <td>${d.charName}</td><td>${Number(d.amount).toLocaleString()}</td><td>${d.date}</td><td>${d.memo || '-'}</td>
-                    ${appState.isAdmin ? `
-                        <td>
-                            <button class="btn btn-warning btn-sm" onclick="openDiaModal(${i})">수정</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteDia(${i})">삭제</button>
-                        </td>
-                    ` : ''}
-                </tr>
-            `).join('') || `<tr><td colspan="${appState.isAdmin ? 5 : 4}">등록된 다이아 분배 내역이 없습니다.</td></tr>`;
-
-            // Admin Toggle Visibility
-            document.querySelectorAll('.admin-only').forEach(el => {
-                el.style.display = appState.isAdmin ? 'inline-block' : 'none';
-            });
-        }
-    </script>
-</body>
-</html>
+            if (confirm('삭제하시겠습니까?')) { appState.
