@@ -347,7 +347,7 @@
         let appState = { isAdmin: false, drops: [], items: [], dias: [] };
         
         // ★ 여기에 구글 앱스 스크립트 웹 앱 URL을 입력하세요 ★
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw15daB8U3Bx_qy_1o6uC6fbnnqoTPLQPlcqZf5C388CUaCPnASuYdgyyXKzvG51bXFKw/exec';
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzlNqGO3fBI8U6B6G2lSDMhDI8Xg1wXoaljJW37M9HjIGWQ6IHZNyfnBv-E-0xpo-8R/exec';
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSheetData();
@@ -527,28 +527,24 @@
             const select = document.getElementById('itemSelect');
             select.innerHTML = '';
             
-            // 1. 이미 '아이템 분배내역'에 등록된 모든 아이템명을 공백 제거 후 Set에 저장
+            // 이미 분배된 아이템 이름 목록 Set 구성
             const distributedItems = new Set(
                 appState.items.map(it => String(it.itemName || '').trim())
             );
             
-            // 2. 획득 내역 중에서 아래 조건을 만족하는 항목만 철저하게 필터링
-            //    - 이미 분배된 아이템(distributedItems에 존재) -> 제외
-            //    - 외판가(price)가 0보다 큰 판매완료된 아이템(Number(d.price) > 0) -> 제외
-            //    - 단, 현재 수정 중인 기존 아이템은 예외적으로 선택 가능하게 허용
-            const availableDrops = appState.drops.filter((d, dIndex) => {
+            // 필터링: (1) 이미 분배된 아이템 제외, (2) 외판가(price) > 0인 판매완료 아이템 제외
+            const availableDrops = appState.drops.filter(d => {
                 const itemName = String(d.item || '').trim();
                 
-                // 수정 모드일 때 현재 선택되어 있는 기존 아이템은 유지
+                // 수정 모드일 때 현재 항목은 유지
                 if (idx !== -1 && appState.items[idx] && String(appState.items[idx].itemName || '').trim() === itemName) {
                     return true;
                 }
                 
-                const isAlreadyDistributed = distributedItems.has(itemName);
-                const isAlreadySold = (Number(d.price) || 0) > 0;
+                const isDistributed = distributedItems.has(itemName);
+                const isSold = (Number(d.price) || 0) > 0;
                 
-                // 분배도 안 되었고 판매도 안 된(미분배) 아이템만 통과!
-                return !isAlreadyDistributed && !isAlreadySold;
+                return !isDistributed && !isSold;
             });
 
             if (availableDrops.length === 0) {
