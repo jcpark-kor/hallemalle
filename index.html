@@ -526,13 +526,26 @@
         function openItemModal(idx = -1) {
             const select = document.getElementById('itemSelect');
             select.innerHTML = '';
-            if (appState.drops.length === 0) {
+            
+            // 이미 분배된 아이템 이름 목록 추출
+            const distributedItems = new Set(appState.items.map(it => String(it.itemName || '').trim()));
+            
+            // 분배되지 않은 아이템만 필터링
+            const availableDrops = appState.drops.filter(d => {
+                // 수정 중인 항목의 기존 아이템은 목록에 다시 포함시켜야 하므로 예외 처리
+                if (idx !== -1 && appState.items[idx] && appState.items[idx].itemName === d.item) {
+                    return true;
+                }
+                return !distributedItems.has(String(d.item || '').trim());
+            });
+
+            if (availableDrops.length === 0) {
                 const opt = document.createElement('option');
                 opt.value = '';
-                opt.textContent = '등록된 획득 아이템이 없습니다';
+                opt.textContent = '분배 가능한 획득 아이템이 없습니다';
                 select.appendChild(opt);
             } else {
-                appState.drops.forEach(d => {
+                availableDrops.forEach(d => {
                     const opt = document.createElement('option');
                     opt.value = d.item;
                     opt.textContent = `${d.item} (${d.boss} - ${d.date})`;
@@ -626,10 +639,10 @@
             document.getElementById('remainingDia').innerText = (rev - dist).toLocaleString() + ' 💎';
             document.getElementById('totalCounts').innerText = `${appState.drops.length}건 / ${appState.items.length}건`;
 
-            // 분배된 아이템 이름 목록 정규화 (공백 제거 및 대소문자 통일)
+            // 분배된 아이템 이름 목록 정규화
             const distributedItems = new Set(appState.items.map(it => String(it.itemName || '').trim()));
 
-            // Drops Table (분배 상태 컬럼 추가 및 체크 로직 강화)
+            // Drops Table
             const dropBody = document.getElementById('dropTableBody');
             dropBody.innerHTML = appState.drops.map((d, i) => {
                 const cleanItemName = String(d.item || '').trim();
