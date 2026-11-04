@@ -347,7 +347,7 @@
         let appState = { isAdmin: false, drops: [], items: [], dias: [] };
         
         // ★ 여기에 구글 앱스 스크립트 웹 앱 URL을 입력하세요 ★
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzlNqGO3fBI8U6B6G2lSDMhDI8Xg1wXoaljJW37M9HjIGWQ6IHZNyfnBv-E-0xpo-8R/exec';
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw9PO88vJVkLllUDpGKDcuPyiLgtyYS9CFSzXD_RBvvIwJb75AJuAdWQWIcdh0hF-xg/exec';
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSheetData();
@@ -527,16 +527,13 @@
             const select = document.getElementById('itemSelect');
             select.innerHTML = '';
             
-            // [날짜+아이템명] 키 조합으로 분배된 내역 Key Set 생성
             const distributedKeys = new Set(
                 appState.items.map(it => `${String(it.date || '').trim()}_${String(it.itemName || '').trim()}`)
             );
             
-            // 획득 내역 중에서 [날짜+아이템명] 기준 미분배 + 미판매(외판가 0) 항목만 추출
             const availableDrops = appState.drops.filter(d => {
                 const dropKey = `${String(d.date || '').trim()}_${String(d.item || '').trim()}`;
                 
-                // 수정 모드일 때 현재 항목은 예외적으로 허용
                 if (idx !== -1 && appState.items[idx]) {
                     const currentItemKey = `${String(appState.items[idx].date || '').trim()}_${String(appState.items[idx].itemName || '').trim()}`;
                     if (currentItemKey === dropKey) return true;
@@ -556,7 +553,6 @@
             } else {
                 availableDrops.forEach(d => {
                     const opt = document.createElement('option');
-                    // value에 "날짜|아이템명" 형태로 저장하여 명확하게 키 보존
                     opt.value = `${d.date}|${d.item}`;
                     opt.textContent = `${d.item} (${d.boss} - ${d.date})`;
                     select.appendChild(opt);
@@ -586,7 +582,6 @@
 
             if (!charName || !selectedVal) return alert('캐릭터명과 아이템을 선택해주세요.');
 
-            // value에 포함된 "날짜|아이템명" 조합 파싱
             const parts = selectedVal.split('|');
             const itemName = parts.length > 1 ? parts[1] : selectedVal;
 
@@ -649,12 +644,10 @@
             
             const totalDropsCount = appState.drops.length;
 
-            // [날짜 + 아이템명] 조합 키 Set 생성
             const distributedItems = new Set(
                 appState.items.map(it => `${String(it.date || '').trim()}_${String(it.itemName || '').trim()}`)
             );
 
-            // 판매완료 건수 계산 ([날짜 + 아이템명] 기준 미분배이면서 외판가 > 0)
             const soldCount = appState.drops.filter(d => {
                 const dropKey = `${String(d.date || '').trim()}_${String(d.item || '').trim()}`;
                 const isDistributed = distributedItems.has(dropKey);
@@ -670,7 +663,7 @@
             document.getElementById('remainingDia').innerText = (rev - dist).toLocaleString() + ' 💎';
             document.getElementById('totalCounts').innerText = `${totalDropsCount}건 / ${completedCount}건`;
 
-            // Drops Table (획득 내역 렌더링 시 [날짜 + 아이템명] 키를 이용해 정확히 상태 연동)
+            // Drops Table
             const dropBody = document.getElementById('dropTableBody');
             dropBody.innerHTML = appState.drops.map((d, i) => {
                 const dropKey = `${String(d.date || '').trim()}_${String(d.item || '').trim()}`;
