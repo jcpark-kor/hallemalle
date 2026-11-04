@@ -527,16 +527,22 @@
             const select = document.getElementById('itemSelect');
             select.innerHTML = '';
             
-            const distributedItems = new Set(
-                appState.items.map(it => String(it.itemName || '').trim())
+            // [날짜+아이템명] 조합으로 분배된 내역 Key Set 생성 (예: "2026-10-17_집판검")
+            const distributedKeys = new Set(
+                appState.items.map(it => `${String(it.date || '').trim()}_${String(it.itemName || '').trim()}`)
             );
             
-            const availableDrops = appState.drops.filter(d => {
-                const itemName = String(d.item || '').trim();
-                if (idx !== -1 && appState.items[idx] && String(appState.items[idx].itemName || '').trim() === itemName) {
-                    return true;
+            // 드롭다운 목록에는 [날짜+아이템명] 기준 미분배 항목만 노출
+            const availableDrops = appState.drops.filter((d, dIndex) => {
+                const dropKey = `${String(d.date || '').trim()}_${String(d.item || '').trim()}`;
+                
+                // 수정 모드일 때 현재 수정 중인 기존 항목은 예외적으로 포함
+                if (idx !== -1 && appState.items[idx]) {
+                    const currentItemKey = `${String(appState.items[idx].date || '').trim()}_${String(appState.items[idx].itemName || '').trim()}`;
+                    if (currentItemKey === dropKey) return true;
                 }
-                const isDistributed = distributedItems.has(itemName);
+                
+                const isDistributed = distributedKeys.has(dropKey);
                 const isSold = (Number(d.price) || 0) > 0;
                 
                 return !isDistributed && !isSold;
@@ -548,9 +554,11 @@
                 opt.textContent = '분배 가능한 미분배 아이템이 없습니다';
                 select.appendChild(opt);
             } else {
-                availableDrops.forEach(d => {
+                availableDrops.forEach((d, originalIndex) => {
+                    const dropKey = `${String(d.date || '').trim()}_${String(d.item || '').trim()}`;
                     const opt = document.createElement('option');
-                    opt.value = d.item;
+                    // value에 고유 구분용 키 조합 저장 (날짜|아이템명)
+                    opt.value = `${d.date}|${d.item}`;
                     opt.textContent = `${d.item} (${d.boss} - ${d.date})`;
                     select.appendChild(opt);
                 });
@@ -566,7 +574,7 @@
                 const it = appState.items[idx];
                 document.getElementById('itemCharName').value = it.charName;
                 document.getElementById('itemDate').value = it.date;
-                document.getElementById('itemSelect').value = it.itemName;
+                document.getElementById('itemSelect').value = `${it.date}|${it.itemName}`;
             }
             document.getElementById('itemModal').style.display = 'flex';
         }
@@ -575,9 +583,13 @@
             const idx = parseInt(document.getElementById('itemEditIndex').value);
             const charName = document.getElementById('itemCharName').value.trim();
             const date = document.getElementById('itemDate').value || getTodayString();
-            const itemName = document.getElementById('itemSelect').value;
+            const selectedVal = document.getElementById('itemSelect').value;
 
-            if (!charName || !itemName) return alert('캐릭터명과 아이템을 선택해주세요.');
+            if (!charName || !selectedVal) return alert('캐릭터명과 아이템을 선택해주세요.');
+
+            // value에 포함된 "날짜|아이템명" 형태에서 아이템명 추출
+            const parts = selectedVal.split('|');
+            const itemName = parts.length > 1 ? parts[1] : selectedVal;
 
             const entry = { charName, date, itemName };
             if (idx === -1) appState.items.push(entry);
@@ -636,19 +648,21 @@
             const rev = appState.drops.reduce((sum, d) => sum + (d.revenue || 0), 0);
             const dist = appState.dias.reduce((sum, d) => sum + (d.amount || 0), 0);
             
-            // 총 획득 건수
             const totalDropsCount = appState.drops.length;
 
-            // 판매완료 건수 계산 (외판가 > 0 이면서 아이템 분배내역에 등록되지 않은 항목)
-            const distributedItems = new Set(appState.items.map(it => String(it.itemName || '').trim()));
+            // [날짜+아이템명] 조합 키 Set 생성하여 분배완료 매칭 정밀화
+            const distributedItems = new Set(
+                appState.items.map(it => `${String(it.date || '').trim()}_${String(it.itemName || '').trim()}`)
+            );
+
+            // 판매완료 건수 계산 ([날짜+아이템명] 기준 미분배이면서 외판가 > 0)
             const soldCount = appState.drops.filter(d => {
-                const itemName = String(d.item || '').trim();
-                const isDistributed = distributedItems.has(itemName);
+                const dropKey = `${String(d.date || '').trim()}_${String(d.item || '').trim()}`;
+                const isDistributed = distributedItems.has(dropKey);
                 const isSold = (Number(d.price) || 0) > 0;
                 return !isDistributed && isSold;
             }).length;
 
-            // 분배 및 판매 완료 건수 = 아이템 분배내역 건수 + 판매완료 건수
             const completedCount = appState.items.length + soldCount;
 
             // Dashboard Render
@@ -660,8 +674,8 @@
             // Drops Table
             const dropBody = document.getElementById('dropTableBody');
             dropBody.innerHTML = appState.drops.map((d, i) => {
-                const cleanItemName = String(d.item || '').trim();
-                const isDistributed = distributedItems.has(cleanItemName);
+                const dropKey = `${String(d.date || '').trim()}_${String(d.item || '').trim()}`;
+                const isDistributed = distributedItems.has(dropKey);
                 
                 let statusBadge = '<span style="color: #a0aec0;">미분배</span>';
                 if (isDistributed) {
